@@ -9,7 +9,7 @@
 
 ## Getting started
 
-This plugins displays a gallery with user's Facebook Albums and Photos, based on the access token provided. The plugin does not handle authorozation and login by itelf. In order to do that and provide access token you can use a plugin like [flutter_facebook_login](https://pub.dartlang.org/packages/flutter_facebook_login), and then just provide the access token to the gallery.
+This plugins displays a gallery with user's Facebook Albums and Photos, based on the access token provided. The plugin does not handle authorozation and login by itelf. In order to do that and provide access token you can use a plugin like [flutter_facebook_auth](https://pub.dartlang.org/packages/flutter_facebook_auth), and then just provide the access token to the gallery.
 
 
 ## TODO

@@ -1,11 +1,24 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_facebook_image_picker/model/photo.dart';
-import 'package:flutter_facebook_login/flutter_facebook_login.dart';
+import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:flutter_facebook_image_picker/flutter_facebook_image_picker.dart';
 
-void main() => runApp(new MyApp());
+void main() {
+  // check if is running on Web
+  if (kIsWeb) {
+    // initialiaze the facebook javascript SDK
+    FacebookAuth.i.webInitialize(
+      appId: "219488965589880", //<-- YOUR APP_ID
+      cookie: true,
+      xfbml: true,
+      version: "v10.0",
+    );
+  }
+  runApp(new MyApp());
+}
 
 class MyApp extends StatefulWidget {
   // This widget is the root of your application.
@@ -38,51 +51,88 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  static final FacebookLogin facebookSignIn = new FacebookLogin();
+  static final FacebookAuth fbInstance = FacebookAuth.instance;
   List<Photo> _photos = [];
   String _accessToken;
   String _error;
+  bool _loading = false;
 
   Future<Null> _login() async {
-    final FacebookLoginResult result =
-        await facebookSignIn.logInWithReadPermissions(['user_photos']);
+    final AccessToken accessToken = await FacebookAuth.instance.accessToken;
+    if (accessToken != null) {
+      setState(() {
+        _loading = true;
+        _accessToken = accessToken.token;
+      });
+      _openImagePicker();
+      return;
+    }
+    final LoginResult result = await fbInstance.login(
+      permissions: ['public_profile', 'email', 'user_photos'],
+    );
 
     switch (result.status) {
-      case FacebookLoginStatus.loggedIn:
-        final FacebookAccessToken accessToken = result.accessToken;
+      case LoginStatus.operationInProgress:
         setState(() {
-          _accessToken = accessToken.token;
+          _loading = true;
         });
-
-        Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => FacebookImagePicker(
-                      _accessToken,
-                      onDone: (items) {
-                        Navigator.pop(context);
-                        setState(() {
-                          _error = null;
-                          _photos = items;
-                        });
-                      },
-                      onCancel: () => Navigator.pop(context),
-                    ),
-              ),
-            );
         break;
-      case FacebookLoginStatus.cancelledByUser:
+      case LoginStatus.success:
+        final AccessToken accessToken = result?.accessToken ?? null;
+        if (accessToken == null) {
+          setState(() {
+            _error = "Unsuccessful facebook login attempt. Get help";
+            _loading = false;
+          });
+        } else {
+          setState(() {
+            _accessToken = accessToken.token;
+          });
+          _openImagePicker();
+        }
+        break;
+      case LoginStatus.cancelled:
         setState(() {
+          _loading = false;
           _error = 'Login cancelled by the user.';
         });
 
         break;
-      case FacebookLoginStatus.error:
+      case LoginStatus.failed:
         setState(() {
           _error = 'Something went wrong with the login process.\n'
-              'Here\'s the error Facebook gave us: ${result.errorMessage}';
+              'Here\'s the error Facebook gave us: ${result.message}';
+          _loading = false;
         });
         break;
     }
+  }
+
+  _openImagePicker() async {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FacebookImagePicker(
+          _accessToken,
+          onDone: (items) async {
+            Navigator.pop(context);
+            setState(() {
+              _error = null;
+              _photos = items;
+              _loading = false;
+            });
+            await fbInstance.logOut();
+          },
+          onCancel: () async {
+            Navigator.pop(context);
+            setState(() {
+              _loading = false;
+              _error = 'No photos received';
+            });
+            await fbInstance.logOut();
+          },
+        ),
+      ),
+    );
   }
 
   @override
@@ -100,16 +150,18 @@ class _MyHomePageState extends State<MyHomePage> {
             child: new Center(
               // Center is a layout widget. It takes a single child and positions it
               // in the middle of the parent.
-              child: MaterialButton(
-                onPressed: () => _login(),
-                color: Colors.blue,
-                child: Text(
-                  "Pick images",
-                  style: TextStyle(
-                    color: Colors.white,
-                  ),
-                ),
-              ),
+              child: !_loading
+                  ? MaterialButton(
+                      onPressed: () => _login(),
+                      color: Colors.blue,
+                      child: Text(
+                        "Pick images",
+                        style: TextStyle(
+                          color: Colors.white,
+                        ),
+                      ),
+                    )
+                  : CircularProgressIndicator(),
             ),
           ),
           _error != null ? Text(_error) : null,
