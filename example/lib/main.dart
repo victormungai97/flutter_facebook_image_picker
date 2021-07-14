@@ -58,7 +58,7 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _loading = false;
 
   Future<Null> _login() async {
-    final AccessToken accessToken = await FacebookAuth.instance.accessToken;
+    final AccessToken accessToken = await fbInstance.accessToken;
     if (accessToken != null) {
       setState(() {
         _loading = true;
